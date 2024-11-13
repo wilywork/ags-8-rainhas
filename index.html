@@ -227,7 +227,11 @@
                 for (let j = i + 1; j < individuo.length; j++) {
                     const rainha1 = individuo[i];
                     const rainha2 = individuo[j];
-                    if (rainha1.linha === rainha2.linha || rainha1.coluna === rainha2.coluna || Math.abs(rainha1.linha - rainha2.linha) === Math.abs(rainha1.coluna - rainha2.coluna)) {
+                    if (
+                        rainha1.linha === rainha2.linha ||
+                        rainha1.coluna === rainha2.coluna ||
+                        Math.abs(rainha1.linha - rainha2.linha) === Math.abs(rainha1.coluna - rainha2.coluna)
+                    ) {
                         conflitos++;
                     }
                 }
@@ -272,21 +276,27 @@
             const filho1 = pai1.slice(0, pontoCorte);
             const filho2 = pai2.slice(0, pontoCorte);
 
-            const complementoFilho1 = pai2.filter(gene => !filho1.includes(gene));
-            const complementoFilho2 = pai1.filter(gene => !filho2.includes(gene));
+            const genesRestantes1 = pai2.filter(gene2 => 
+                !filho1.some(gene1 => gene1.linha === gene2.linha && gene1.coluna === gene2.coluna));
+            const genesRestantes2 = pai1.filter(gene1 => 
+                !filho2.some(gene2 => gene2.linha === gene1.linha && gene2.coluna === gene1.coluna));
 
             return [
-                filho1.concat(complementoFilho1),
-                filho2.concat(complementoFilho2)
+                filho1.concat(genesRestantes1),
+                filho2.concat(genesRestantes2)
             ];
         }
 
         function aplicarMutacao(individuo, taxaMutacao) {
-            const novoIndividuo = [...individuo];
+            const novoIndividuo = individuo.map(gene => ({ ...gene }));
             if (Math.random() < taxaMutacao) {
-                const idx1 = Math.floor(Math.random() * novoIndividuo.length);
-                const idx2 = Math.floor(Math.random() * novoIndividuo.length);
-                [novoIndividuo[idx1], novoIndividuo[idx2]] = [novoIndividuo[idx2], novoIndividuo[idx1]];
+                const idx = Math.floor(Math.random() * novoIndividuo.length);
+                const tamanhoTabuleiro = parseInt(document.getElementById('tamanhoTabuleiro').value);
+
+                novoIndividuo[idx] = {
+                    linha: Math.floor(Math.random() * tamanhoTabuleiro),
+                    coluna: Math.floor(Math.random() * tamanhoTabuleiro)
+                };
             }
             return novoIndividuo;
         }
