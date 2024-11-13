@@ -10,4 +10,6 @@ Clique no botão abaixo para acessar a aplicação:
 
 ## Vídeo da apresentação
 
-[![Apresentação](apresentacao.mp4)](apresentacao.mp4)
+[![Assista ao vídeo]()](https://wilywork.github.io/ags-8-rainhas/apresentacao.mp4)
+
+ou baixar do próprio git.
