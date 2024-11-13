@@ -133,14 +133,15 @@
             limparResultados();
 
             const tamanhoTabuleiro = parseInt(document.getElementById('tamanhoTabuleiro').value);
+            const quantidadeRainhas = parseInt(document.getElementById('quantidadeRainhas').value);
             const tamanhoPopulacao = parseInt(document.getElementById('tamanhoPopulacao').value);
             const taxaMutacao = parseFloat(document.getElementById('taxaMutacao').value);
             const maximoGeracoes = parseInt(document.getElementById('maxGeracoes').value);
             const pararAoEncontrarSolucao = document.getElementById('pararAoEncontrarSolucao').checked;
 
-            if (!validarEntrada(tamanhoTabuleiro, taxaMutacao)) return;
+            if (!validarEntrada(tamanhoTabuleiro, quantidadeRainhas, taxaMutacao)) return;
 
-            const resultado = executarAlgoritmoGenetico(tamanhoTabuleiro, tamanhoPopulacao, taxaMutacao, maximoGeracoes, pararAoEncontrarSolucao);
+            const resultado = executarAlgoritmoGenetico(tamanhoTabuleiro, quantidadeRainhas, tamanhoPopulacao, taxaMutacao, maximoGeracoes, pararAoEncontrarSolucao);
 
             if (resultado.solucao) {
                 desenharTabuleiro(resultado.solucao);
@@ -150,9 +151,14 @@
             }
         }
 
-        function validarEntrada(tamanhoTabuleiro, taxaMutacao) {
+        function validarEntrada(tamanhoTabuleiro, quantidadeRainhas, taxaMutacao) {
             if (tamanhoTabuleiro < 4 || isNaN(tamanhoTabuleiro)) {
                 alert('O tamanho do tabuleiro deve ser um número inteiro maior ou igual a 4.');
+                return false;
+            }
+
+            if (quantidadeRainhas < 1 || quantidadeRainhas > tamanhoTabuleiro || isNaN(quantidadeRainhas)) {
+                alert('A quantidade de rainhas deve ser um número inteiro entre 1 e o tamanho do tabuleiro.');
                 return false;
             }
 
@@ -164,8 +170,8 @@
             return true;
         }
 
-        function executarAlgoritmoGenetico(tamanhoTabuleiro, tamanhoPopulacao, taxaMutacao, maximoGeracoes, pararAoEncontrarSolucao) {
-            let populacao = criarPopulacaoInicial(tamanhoPopulacao, tamanhoTabuleiro);
+        function executarAlgoritmoGenetico(tamanhoTabuleiro, quantidadeRainhas, tamanhoPopulacao, taxaMutacao, maximoGeracoes, pararAoEncontrarSolucao) {
+            let populacao = criarPopulacaoInicial(tamanhoPopulacao, tamanhoTabuleiro, quantidadeRainhas);
             let melhorIndividuo = null;
             let menorConflitos = Infinity;
             let geracaoMelhor = 0;
@@ -197,15 +203,18 @@
             return { solucao: melhorIndividuo, geracao: geracaoMelhor, conflitos: menorConflitos };
         }
 
-        function criarPopulacaoInicial(tamanhoPopulacao, tamanhoTabuleiro) {
+        function criarPopulacaoInicial(tamanhoPopulacao, tamanhoTabuleiro, quantidadeRainhas) {
             const populacao = [];
             for (let i = 0; i < tamanhoPopulacao; i++) {
                 const individuo = [];
-                const genesDisponiveis = [...Array(tamanhoTabuleiro).keys()];
-                for (let linha = 0; linha < tamanhoTabuleiro; linha++) {
-                    const indiceAleatorio = Math.floor(Math.random() * genesDisponiveis.length);
-                    const coluna = genesDisponiveis.splice(indiceAleatorio, 1)[0];
-                    individuo.push(coluna);
+                const linhasDisponiveis = [...Array(tamanhoTabuleiro).keys()];
+                const colunasDisponiveis = [...Array(tamanhoTabuleiro).keys()];
+                for (let j = 0; j < quantidadeRainhas; j++) {
+                    const indiceLinha = Math.floor(Math.random() * linhasDisponiveis.length);
+                    const linha = linhasDisponiveis.splice(indiceLinha, 1)[0];
+                    const indiceColuna = Math.floor(Math.random() * colunasDisponiveis.length);
+                    const coluna = colunasDisponiveis.splice(indiceColuna, 1)[0];
+                    individuo.push({ linha, coluna });
                 }
                 populacao.push(individuo);
             }
@@ -216,7 +225,9 @@
             let conflitos = 0;
             for (let i = 0; i < individuo.length - 1; i++) {
                 for (let j = i + 1; j < individuo.length; j++) {
-                    if (Math.abs(individuo[i] - individuo[j]) === Math.abs(i - j)) {
+                    const rainha1 = individuo[i];
+                    const rainha2 = individuo[j];
+                    if (rainha1.linha === rainha2.linha || rainha1.coluna === rainha2.coluna || Math.abs(rainha1.linha - rainha2.linha) === Math.abs(rainha1.coluna - rainha2.coluna)) {
                         conflitos++;
                     }
                 }
@@ -281,17 +292,19 @@
         }
 
         function desenharTabuleiro(solucao) {
-            const tamanhoTabuleiro = solucao.length;
+            const tamanhoTabuleiro = parseInt(document.getElementById('tamanhoTabuleiro').value);
             const tabuleiroDiv = document.getElementById('tabuleiro');
             tabuleiroDiv.innerHTML = '';
             tabuleiroDiv.style.gridTemplateColumns = `repeat(${tamanhoTabuleiro}, 50px)`;
-            
+
+            const posicoesRainhas = new Set(solucao.map(rainha => `${rainha.linha},${rainha.coluna}`));
+
             for (let linha = 0; linha < tamanhoTabuleiro; linha++) {
                 for (let coluna = 0; coluna < tamanhoTabuleiro; coluna++) {
                     const celula = document.createElement('div');
                     celula.classList.add('celula', (linha + coluna) % 2 === 0 ? 'branca' : 'preta');
 
-                    if (solucao[linha] === coluna) {
+                    if (posicoesRainhas.has(`${linha},${coluna}`)) {
                         celula.classList.add('rainha');
                         celula.textContent = 'X';
                     }
@@ -309,7 +322,7 @@
                 <p><strong>Número Máximo de Gerações:</strong> ${maximoGeracoes}</p>
                 <p><strong>Geração da Melhor Solução:</strong> ${resultado.geracao}</p>
                 <p><strong>Número de Conflitos:</strong> ${resultado.conflitos}</p>
-                <p><strong>Solução:</strong> [${resultado.solucao.join(', ')}]</p>
+                <p><strong>Solução:</strong> [${resultado.solucao.map(rainha => `(${rainha.linha}, ${rainha.coluna})`).join(', ')}]</p>
             `;
         }
 
