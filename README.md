@@ -10,6 +10,4 @@ Clique no botão abaixo para acessar a aplicação:
 
 ## Vídeo da apresentação
 
-Veja a demonstração do projeto no vídeo abaixo:
-
 [![Apresentação](apresentacao.mp4)](apresentacao.mp4)
