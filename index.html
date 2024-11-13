@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Problema das N-Rainhas com Algoritmo Genético - trabalho 3.1 Inteligência Artificial</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        #tabuleiro {
+            margin: 20px auto;
+            display: grid;
+            grid-gap: 1px;
+            justify-content: center;
+        }
+        .celula {
+            width: 50px;
+            height: 50px;
+        }
+        .branca {
+            background-color: #b16425;
+        }
+        .preta {
+            background-color: #cbc3b7;
+        }
+        .rainha {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            color: #000000;
+        }
+        input[type=number] {
+            width: 80px;
+            padding: 5px;
+            text-align: center;
+            max-width: 80px;
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-top: 10px;
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #444;
+        }
+        .configuracoes {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .configuracoes .campo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .configuracoes .campo label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #e0e0e0;
+        }
+        .informacoes {
+            margin: 20px auto;
+            width: 80%;
+            text-align: left;
+            background-color: #333;
+            padding: 10px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #e0e0e0;
+        }
+        #performanceChart {
+            max-height: 400px;
+            margin: 0px 5%;
+        }
+    </style>
+    <script src="chart.min.js"></script>
+</head>
+<body>
+    <h1>Problema das N-Rainhas com Algoritmo Genético</h1>
+    <div class="configuracoes">
+        <div class="campo">
+            <label for="tamanhoTabuleiro">Tamanho do Tabuleiro (Min: 4):</label>
+            <input type="number" id="tamanhoTabuleiro" min="4" value="8">
+        </div>
+        <div class="campo">
+            <label for="quantidadeRainhas">Quantidade de Rainhas:</label>
+            <input type="number" id="quantidadeRainhas" min="1" value="8">
+        </div>
+        <div class="campo">
+            <label for="tamanhoPopulacao">Tamanho da População:</label>
+            <input type="number" id="tamanhoPopulacao" min="10" value="100">
+        </div>
+        <div class="campo">
+            <label for="taxaMutacao">Taxa de Mutação (0 - 1):</label>
+            <input type="number" id="taxaMutacao" min="0" max="1" step="0.01" value="0.05">
+        </div>
+        <div class="campo">
+            <label for="maxGeracoes">Número Máximo de Gerações:</label>
+            <input type="number" id="maxGeracoes" min="100" value="1000">
+        </div>
+        <div class="campo">
+            <label for="pararAoEncontrarSolucao">Parar ao encontrar solução perfeita:</label>
+            <input type="checkbox" id="pararAoEncontrarSolucao">
+        </div>
+        <button onclick="resolverRainhas()">Resolver</button>
+    </div>
+    <div id="tabuleiro"></div>
+    <div id="informacoes" class="informacoes"></div>
+
+    <canvas id="performanceChart"></canvas>
+
+    <script>
+        'use strict';
+
+        let graficoDesempenho = null;
+
+        function resolverRainhas() {
+            limparResultados();
+
+            const tamanhoTabuleiro = parseInt(document.getElementById('tamanhoTabuleiro').value);
+            const tamanhoPopulacao = parseInt(document.getElementById('tamanhoPopulacao').value);
+            const taxaMutacao = parseFloat(document.getElementById('taxaMutacao').value);
+            const maximoGeracoes = parseInt(document.getElementById('maxGeracoes').value);
+            const pararAoEncontrarSolucao = document.getElementById('pararAoEncontrarSolucao').checked;
+
+            if (!validarEntrada(tamanhoTabuleiro, taxaMutacao)) return;
+
+            const resultado = executarAlgoritmoGenetico(tamanhoTabuleiro, tamanhoPopulacao, taxaMutacao, maximoGeracoes, pararAoEncontrarSolucao);
+
+            if (resultado.solucao) {
+                desenharTabuleiro(resultado.solucao);
+                exibirInformacoes(tamanhoTabuleiro, tamanhoPopulacao, taxaMutacao, maximoGeracoes, resultado);
+            } else {
+                alert(`Nenhuma solução encontrada para um tabuleiro de tamanho ${tamanhoTabuleiro}.`);
+            }
+        }
+
+        function validarEntrada(tamanhoTabuleiro, taxaMutacao) {
+            if (tamanhoTabuleiro < 4 || isNaN(tamanhoTabuleiro)) {
+                alert('O tamanho do tabuleiro deve ser um número inteiro maior ou igual a 4.');
+                return false;
+            }
+
+            if (taxaMutacao < 0 || taxaMutacao > 1 || isNaN(taxaMutacao)) {
+                alert('Taxa de Mutação deve ser um número entre 0 e 1.');
+                return false;
+            }
+
+            return true;
+        }
+
+        function executarAlgoritmoGenetico(tamanhoTabuleiro, tamanhoPopulacao, taxaMutacao, maximoGeracoes, pararAoEncontrarSolucao) {
+            let populacao = criarPopulacaoInicial(tamanhoPopulacao, tamanhoTabuleiro);
+            let melhorIndividuo = null;
+            let menorConflitos = Infinity;
+            let geracaoMelhor = 0;
+            let dadosDesempenho = [];
+
+            for (let geracao = 0; geracao <= maximoGeracoes; geracao++) {
+                populacao.sort((a, b) => calcularConflitos(a) - calcularConflitos(b));
+
+                const individuoAtual = populacao[0];
+                const conflitosAtuais = calcularConflitos(individuoAtual);
+
+                if (conflitosAtuais < menorConflitos) {
+                    menorConflitos = conflitosAtuais;
+                    melhorIndividuo = individuoAtual;
+                    geracaoMelhor = geracao;
+                }
+
+                dadosDesempenho.push({ geracao, conflitos: conflitosAtuais });
+
+                if (pararAoEncontrarSolucao && conflitosAtuais === 0) {
+                    break;
+                }
+
+                populacao = gerarNovaPopulacao(populacao, tamanhoPopulacao, taxaMutacao);
+            }
+
+            renderizarGraficoDesempenho(dadosDesempenho);
+
+            return { solucao: melhorIndividuo, geracao: geracaoMelhor, conflitos: menorConflitos };
+        }
+
+        function criarPopulacaoInicial(tamanhoPopulacao, tamanhoTabuleiro) {
+            const populacao = [];
+            for (let i = 0; i < tamanhoPopulacao; i++) {
+                const individuo = [];
+                const genesDisponiveis = [...Array(tamanhoTabuleiro).keys()];
+                for (let linha = 0; linha < tamanhoTabuleiro; linha++) {
+                    const indiceAleatorio = Math.floor(Math.random() * genesDisponiveis.length);
+                    const coluna = genesDisponiveis.splice(indiceAleatorio, 1)[0];
+                    individuo.push(coluna);
+                }
+                populacao.push(individuo);
+            }
+            return populacao;
+        }
+
+        function calcularConflitos(individuo) {
+            let conflitos = 0;
+            for (let i = 0; i < individuo.length - 1; i++) {
+                for (let j = i + 1; j < individuo.length; j++) {
+                    if (Math.abs(individuo[i] - individuo[j]) === Math.abs(i - j)) {
+                        conflitos++;
+                    }
+                }
+            }
+            return conflitos;
+        }
+
+        function gerarNovaPopulacao(populacao, tamanhoPopulacao, taxaMutacao) {
+            const novaPopulacao = [];
+            const aptidoes = populacao.map(individuo => 1 / (1 + calcularConflitos(individuo)));
+            const aptidaoTotal = aptidoes.reduce((acc, apt) => acc + apt, 0);
+
+            while (novaPopulacao.length < tamanhoPopulacao) {
+                const pai1 = selecionarIndividuo(populacao, aptidoes, aptidaoTotal);
+                const pai2 = selecionarIndividuo(populacao, aptidoes, aptidaoTotal);
+
+                const [filho1, filho2] = cruzarIndividuos(pai1, pai2);
+
+                novaPopulacao.push(aplicarMutacao(filho1, taxaMutacao));
+                if (novaPopulacao.length < tamanhoPopulacao) {
+                    novaPopulacao.push(aplicarMutacao(filho2, taxaMutacao));
+                }
+            }
+            return novaPopulacao;
+        }
+
+        function selecionarIndividuo(populacao, aptidoes, aptidaoTotal) {
+            const rand = Math.random() * aptidaoTotal;
+            let soma = 0;
+            for (let i = 0; i < populacao.length; i++) {
+                soma += aptidoes[i];
+                if (soma >= rand) {
+                    return populacao[i];
+                }
+            }
+            return populacao[populacao.length - 1];
+        }
+
+        function cruzarIndividuos(pai1, pai2) {
+            const tamanho = pai1.length;
+            const pontoCorte = Math.floor(Math.random() * tamanho);
+            const filho1 = pai1.slice(0, pontoCorte);
+            const filho2 = pai2.slice(0, pontoCorte);
+
+            const complementoFilho1 = pai2.filter(gene => !filho1.includes(gene));
+            const complementoFilho2 = pai1.filter(gene => !filho2.includes(gene));
+
+            return [
+                filho1.concat(complementoFilho1),
+                filho2.concat(complementoFilho2)
+            ];
+        }
+
+        function aplicarMutacao(individuo, taxaMutacao) {
+            const novoIndividuo = [...individuo];
+            if (Math.random() < taxaMutacao) {
+                const idx1 = Math.floor(Math.random() * novoIndividuo.length);
+                const idx2 = Math.floor(Math.random() * novoIndividuo.length);
+                [novoIndividuo[idx1], novoIndividuo[idx2]] = [novoIndividuo[idx2], novoIndividuo[idx1]];
+            }
+            return novoIndividuo;
+        }
+
+        function desenharTabuleiro(solucao) {
+            const tamanhoTabuleiro = solucao.length;
+            const tabuleiroDiv = document.getElementById('tabuleiro');
+            tabuleiroDiv.innerHTML = '';
+            tabuleiroDiv.style.gridTemplateColumns = `repeat(${tamanhoTabuleiro}, 50px)`;
+            
+            for (let linha = 0; linha < tamanhoTabuleiro; linha++) {
+                for (let coluna = 0; coluna < tamanhoTabuleiro; coluna++) {
+                    const celula = document.createElement('div');
+                    celula.classList.add('celula', (linha + coluna) % 2 === 0 ? 'branca' : 'preta');
+
+                    if (solucao[linha] === coluna) {
+                        celula.classList.add('rainha');
+                        celula.textContent = 'X';
+                    }
+                    tabuleiroDiv.appendChild(celula);
+                }
+            }
+        }
+
+        function exibirInformacoes(tamanhoTabuleiro, tamanhoPopulacao, taxaMutacao, maximoGeracoes, resultado) {
+            const infoDiv = document.getElementById('informacoes');
+            infoDiv.innerHTML = `
+                <p><strong>Tamanho do Tabuleiro:</strong> ${tamanhoTabuleiro}</p>
+                <p><strong>Tamanho da População:</strong> ${tamanhoPopulacao}</p>
+                <p><strong>Taxa de Mutação:</strong> ${taxaMutacao}</p>
+                <p><strong>Número Máximo de Gerações:</strong> ${maximoGeracoes}</p>
+                <p><strong>Geração da Melhor Solução:</strong> ${resultado.geracao}</p>
+                <p><strong>Número de Conflitos:</strong> ${resultado.conflitos}</p>
+                <p><strong>Solução:</strong> [${resultado.solucao.join(', ')}]</p>
+            `;
+        }
+
+        function limparResultados() {
+            document.getElementById('tabuleiro').innerHTML = '';
+            document.getElementById('informacoes').innerHTML = '';
+
+            if (graficoDesempenho) {
+                graficoDesempenho.destroy();
+                graficoDesempenho = null;
+            }
+
+            const canvas = document.getElementById('performanceChart');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function renderizarGraficoDesempenho(dadosDesempenho) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+
+            if (graficoDesempenho) {
+                graficoDesempenho.destroy();
+            }
+
+            graficoDesempenho = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dadosDesempenho.map(data => data.geracao),
+                    datasets: [{
+                        label: 'Conflitos por Geração',
+                        data: dadosDesempenho.map(data => data.conflitos),
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Geração'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Conflitos'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
